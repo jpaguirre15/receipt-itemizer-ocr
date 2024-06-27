@@ -1,9 +1,11 @@
 const canvas = document.getElementById('highlightCanvas');
 const ctx = canvas.getContext('2d');
 let img = new Image();
-let startX, startY, endX, endY, isDrawing = false;
+let isFirstTap = true;
+let startX, startY, endX, endY;
 let rectangles = [];
 
+// Handle image upload
 document.getElementById('receiptImage').addEventListener('change', handleImage, false);
 
 function handleImage(e) {
@@ -20,28 +22,34 @@ function handleImage(e) {
   reader.readAsDataURL(e.target.files[0]);
 }
 
-canvas.addEventListener('mousedown', (e) => {
-  startX = e.offsetX;
-  startY = e.offsetY;
-  isDrawing = true;
-});
-
-canvas.addEventListener('mousemove', (e) => {
-  if (isDrawing) {
-    endX = e.offsetX;
-    endY = e.offsetY;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-    ctx.beginPath();
-    ctx.rect(startX, startY, endX - startX, endY - startY);
-    ctx.stroke();
+// Handle touch events
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const x = touch.clientX - rect.left;
+  const y = touch.clientY - rect.top;
+  
+  if (isFirstTap) {
+    startX = x;
+    startY = y;
+    isFirstTap = false;
+  } else {
+    endX = x;
+    endY = y;
+    isFirstTap = true;
+    rectangles.push({ startX, startY, endX, endY });
+    drawRectangle(startX, startY, endX, endY);
   }
 });
 
-canvas.addEventListener('mouseup', () => {
-  isDrawing = false;
-  rectangles.push({ startX, startY, width: endX - startX, height: endY - startY });
-});
+function drawRectangle(startX, startY, endX, endY) {
+  ctx.strokeStyle = 'red';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.rect(startX, startY, endX - startX, endY - startY);
+  ctx.stroke();
+}
 
 const extractText = async (imageDataURL) => {
   const result = await Tesseract.recognize(imageDataURL, 'eng', {
@@ -72,9 +80,11 @@ const processReceipt = async () => {
   for (const rect of rectangles) {
     const croppedCanvas = document.createElement('canvas');
     const croppedCtx = croppedCanvas.getContext('2d');
-    croppedCanvas.width = rect.width;
-    croppedCanvas.height = rect.height;
-    croppedCtx.drawImage(canvas, rect.startX, rect.startY, rect.width, rect.height, 0, 0, rect.width, rect.height);
+    const width = rect.endX - rect.startX;
+    const height = rect.endY - rect.startY;
+    croppedCanvas.width = width;
+    croppedCanvas.height = height;
+    croppedCtx.drawImage(canvas, rect.startX, rect.startY, width, height, 0, 0, width, height);
     const dataURL = croppedCanvas.toDataURL('image/png');
     const text = await extractText(dataURL);
     const parsedItems = parseReceipt(text);
