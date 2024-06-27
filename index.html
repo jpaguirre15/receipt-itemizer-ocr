@@ -19,6 +19,9 @@
     .item input {
       margin-right: 10px;
     }
+    .loading {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -28,6 +31,7 @@
   <canvas id="receiptCanvas"></canvas>
   <div id="checklist"></div>
   <button onclick="submitChecklist()">Submit</button>
+  <div class="loading" id="loading">Processing...</div>
   <script src="script.js"></script>
 </body>
 </html>

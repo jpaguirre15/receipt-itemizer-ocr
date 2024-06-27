@@ -1,8 +1,8 @@
 const canvas = document.getElementById('receiptCanvas');
 const ctx = canvas.getContext('2d');
+const loadingIndicator = document.getElementById('loading');
 let img = new Image();
 
-// Handle image upload
 document.getElementById('receiptImage').addEventListener('change', handleImage, false);
 
 function handleImage(e) {
@@ -10,20 +10,49 @@ function handleImage(e) {
   reader.onload = function(event) {
     img = new Image();
     img.onload = function() {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
+      preprocessImage(img);
     };
     img.src = event.target.result;
   };
   reader.readAsDataURL(e.target.files[0]);
 }
 
+function preprocessImage(image) {
+  const maxDim = 1024;
+  let width = image.width;
+  let height = image.height;
+
+  if (width > height) {
+    if (width > maxDim) {
+      height *= maxDim / width;
+      width = maxDim;
+    }
+  } else {
+    if (height > maxDim) {
+      width *= maxDim / height;
+      height = maxDim;
+    }
+  }
+
+  canvas.width = width;
+  canvas.height = height;
+  ctx.drawImage(image, 0, 0, width, height);
+}
+
 const extractText = async (imageDataURL) => {
-  const result = await Tesseract.recognize(imageDataURL, 'eng', {
-    logger: (m) => console.log(m), // Optional: log progress
+  return new Promise((resolve, reject) => {
+    const worker = Tesseract.createWorker({
+      logger: (m) => console.log(m), // Optional: log progress
+    });
+    (async () => {
+      await worker.load();
+      await worker.loadLanguage('eng');
+      await worker.initialize('eng');
+      const result = await worker.recognize(imageDataURL);
+      await worker.terminate();
+      resolve(result.data.text);
+    })();
   });
-  return result.data.text;
 };
 
 const parseReceipt = (text) => {
@@ -44,10 +73,12 @@ const parseReceipt = (text) => {
 };
 
 const processReceipt = async () => {
+  loadingIndicator.style.display = 'block';
   const dataURL = canvas.toDataURL('image/png');
   const text = await extractText(dataURL);
   const items = parseReceipt(text);
   displayChecklist(items);
+  loadingIndicator.style.display = 'none';
 };
 
 const displayChecklist = (items) => {
@@ -81,5 +112,5 @@ const submitChecklist = () => {
     }
   });
   console.log('Submitted items:', checkedItems);
-  // You can add further processing for the submitted items here
+  // Further processing for the submitted items can be added here
 };
